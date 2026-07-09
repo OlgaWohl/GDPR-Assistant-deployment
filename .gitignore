@@ -1,0 +1,61 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Python environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+cached_data/
+
+# Editors and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local application data
+users/*.db
+users/*.db-*
+
+# Ingestion code, raw sources, and local experiments
+/ingest.py
+/guidance_metadata.py
+/data/
+
+/gdpr_data/
+
+/saved_models/
+/experiments/
+/experiments_presentation/
+/server/
+*.pdf
+
+*.ipynb
+*.pptx
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Commit the ready Qdrant collection
+!/qdrant_data/
+!/qdrant_data/meta.json
+!/qdrant_data/collection/
+!/qdrant_data/collection/**
+
+# Do not commit Qdrant runtime/system files
+/qdrant_data/.lock
+/qdrant_data/**/.DS_Store
+/qdrant_data/**/*.sqlite-wal
+/qdrant_data/**/*.sqlite-shm
