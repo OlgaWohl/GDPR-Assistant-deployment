@@ -1,15 +1,29 @@
 import hashlib
 import logging
+import os
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
 
 from users import database
-from users.email_service import send_verification_code
+from users.email_service import (
+    send_access_request_notification,
+    send_verification_code,
+)
 
 
 DEFAULT_QUESTIONS_PER_USER = database.DEFAULT_QUESTION_LIMIT
 CODE_EXPIRY_MINUTES = 10
+ACCESS_REQUEST_COOLDOWN_HOURS = 24
+ACCESS_REQUEST_PURPOSES = ("Work", "Study", "Personal use", "Other")
+MAX_ACCESS_REQUEST_COMMENT_LENGTH = 1000
+ACCESS_REQUEST_SUBMITTED_MESSAGE = (
+    "Your request has been submitted. The administrator will review it shortly."
+)
+ACCESS_REQUEST_RECENT_MESSAGE = (
+    "You already submitted a request recently. "
+    "The administrator will review it shortly."
+)
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 VERIFICATION_REQUEST_MESSAGE = (
     "If this email is allowed, a verification code has been sent."
@@ -26,6 +40,17 @@ def normalize_email(email):
 
 def is_valid_email(email):
     return bool(EMAIL_PATTERN.match(normalize_email(email)))
+
+
+def get_access_request_recipient():
+    return normalize_email(
+        os.getenv("ACCESS_REQUEST_EMAIL") or os.getenv("ADMIN_EMAIL", "")
+    )
+
+
+def _sanitize_access_request_comment(comment):
+    sanitized = " ".join((comment or "").split())
+    return sanitized[:MAX_ACCESS_REQUEST_COMMENT_LENGTH]
 
 
 def _new_code():
@@ -155,3 +180,73 @@ def grant_more_access(email, extra_questions):
             "limit": user["question_limit"],
         },
     }
+
+
+def submit_access_request(email, purpose, comment):
+    email = normalize_email(email)
+    purpose = (purpose or "").strip()
+    comment = _sanitize_access_request_comment(comment)
+
+    if not is_valid_email(email) or not is_verified(email):
+        return {
+            "ok": False,
+            "created": False,
+            "message": "Please verify your email before requesting more access.",
+        }
+
+    if purpose not in ACCESS_REQUEST_PURPOSES:
+        return {
+            "ok": False,
+            "created": False,
+            "message": "Please select a purpose for your request.",
+        }
+
+    cooldown_start = (
+        datetime.now(timezone.utc) - timedelta(hours=ACCESS_REQUEST_COOLDOWN_HOURS)
+    ).isoformat()
+    recent_request = database.get_recent_access_request(email, cooldown_start)
+    if recent_request:
+        return {
+            "ok": True,
+            "created": False,
+            "message": ACCESS_REQUEST_RECENT_MESSAGE,
+        }
+
+    access_request = database.create_access_request(email, purpose, comment)
+    recipient = get_access_request_recipient()
+
+    if not recipient:
+        logger.warning("Access request notification skipped: no recipient configured")
+        database.update_access_request_email_status(
+            access_request["id"],
+            "not_configured",
+        )
+        return {
+            "ok": True,
+            "created": True,
+            "message": ACCESS_REQUEST_SUBMITTED_MESSAGE,
+        }
+
+    try:
+        send_access_request_notification(
+            recipient,
+            access_request["email"],
+            access_request["purpose"],
+            access_request["comment"],
+            access_request["created_at"],
+        )
+    except Exception:
+        logger.exception("Access request email delivery failed")
+        database.update_access_request_email_status(access_request["id"], "failed")
+    else:
+        database.update_access_request_email_status(access_request["id"], "sent")
+
+    return {
+        "ok": True,
+        "created": True,
+        "message": ACCESS_REQUEST_SUBMITTED_MESSAGE,
+    }
+
+
+def list_access_requests(limit=100):
+    return [dict(row) for row in database.list_access_requests(limit)]

@@ -57,6 +57,27 @@ def init_db():
                 "ALTER TABLE users ADD COLUMN question_limit INTEGER NOT NULL DEFAULT 3"
             )
 
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS access_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL,
+                purpose TEXT NOT NULL,
+                comment TEXT,
+                status TEXT NOT NULL DEFAULT 'pending',
+                email_delivery_status TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_access_requests_email_created_at
+            ON access_requests(email, created_at)
+            """
+        )
+
 
 def upsert_verification_code(email, code, expires_at):
     init_db()
@@ -176,3 +197,78 @@ def grant_extra_questions(email, extra_questions):
             """,
             (email,),
         ).fetchone()
+
+
+def get_recent_access_request(email, since):
+    init_db()
+
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM access_requests
+            WHERE email = ?
+              AND created_at >= ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (email, since),
+        ).fetchone()
+
+
+def create_access_request(email, purpose, comment):
+    init_db()
+    now = utc_now_iso()
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO access_requests (
+                email,
+                purpose,
+                comment,
+                status,
+                email_delivery_status,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, 'pending', 'pending', ?, ?)
+            """,
+            (email, purpose, comment, now, now),
+        )
+        return connection.execute(
+            "SELECT * FROM access_requests WHERE id = ?",
+            (cursor.lastrowid,),
+        ).fetchone()
+
+
+def update_access_request_email_status(request_id, email_delivery_status):
+    init_db()
+    now = utc_now_iso()
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE access_requests
+            SET
+                email_delivery_status = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (email_delivery_status, now, request_id),
+        )
+
+
+def list_access_requests(limit=100):
+    init_db()
+
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT email, purpose, comment, created_at, status
+            FROM access_requests
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()

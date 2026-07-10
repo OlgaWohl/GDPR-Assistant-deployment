@@ -33,20 +33,15 @@ def _smtp_configured():
     return all(required_values)
 
 
-def send_verification_code(email, code):
+def send_email(to_email, subject, body):
     if not _smtp_configured():
-        if development_code_enabled():
-            return {"sent": False, "dev_code": code}
         raise RuntimeError("SMTP is not fully configured")
 
     message = EmailMessage()
-    message["Subject"] = "Your GDPR Assistant access code"
+    message["Subject"] = subject
     message["From"] = os.getenv("EMAIL_FROM")
-    message["To"] = email
-    message.set_content(
-        "Your GDPR Assistant verification code is: "
-        f"{code}\n\nThis code expires in 10 minutes."
-    )
+    message["To"] = to_email
+    message.set_content(body)
 
     with smtplib.SMTP(os.getenv("SMTP_HOST"), _smtp_port(), timeout=15) as smtp:
         if _smtp_uses_tls():
@@ -55,7 +50,39 @@ def send_verification_code(email, code):
         smtp.login(os.getenv("SMTP_USER"), os.getenv("SMTP_PASSWORD"))
         smtp.send_message(message)
 
+    return {"sent": True}
+
+
+def send_verification_code(email, code):
+    if not _smtp_configured():
+        if development_code_enabled():
+            return {"sent": False, "dev_code": code}
+        raise RuntimeError("SMTP is not fully configured")
+
+    result = send_email(
+        email,
+        "Your GDPR Assistant access code",
+        "Your GDPR Assistant verification code is: "
+        f"{code}\n\nThis code expires in 10 minutes.",
+    )
+
     return {
-        "sent": True,
+        "sent": result["sent"],
         "dev_code": code if development_code_enabled() else None,
     }
+
+
+def send_access_request_notification(to_email, user_email, purpose, comment, created_at):
+    comment_text = comment or "No additional comments."
+    body = (
+        "A GDPR Assistant user requested more access.\n\n"
+        f"User email: {user_email}\n"
+        f"Purpose: {purpose}\n"
+        f"Submitted at: {created_at}\n\n"
+        f"Comment:\n{comment_text}\n"
+    )
+    return send_email(
+        to_email,
+        "New GDPR Assistant access request",
+        body,
+    )

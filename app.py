@@ -1,15 +1,20 @@
 import os
 
 import streamlit as st
+import streamlit.components.v1 as components
 from rag_pipeline import answer_question
 from users.auth_usage import (
+    ACCESS_REQUEST_PURPOSES,
+    ACCESS_REQUEST_SUBMITTED_MESSAGE,
     can_ask_question,
     grant_more_access,
     get_question_usage,
+    list_access_requests,
     normalize_email,
     request_verification_code,
     verify_email_code,
     record_question,
+    submit_access_request,
 )
 
 st.set_page_config(page_title="GDPR Assistant", page_icon="⚖️")
@@ -25,6 +30,70 @@ st.caption("AI assistant for GDPR questions.")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+ADMIN_CONTACT_EMAIL = "assistant.legalai@gmail.com"
+REQUEST_MORE_ACCESS_LABEL = "Request more access"
+ACCESS_REQUEST_FORM_ANCHOR = "access-request-form-anchor"
+ACCESS_REQUEST_CONFIRMATION_ANCHOR = "access-request-confirmation-anchor"
+
+
+def scroll_to_latest_message():
+    components.html(
+        """
+        <script>
+        const scrollToBottom = () => {
+            const parentWindow = window.parent;
+            const parentDocument = parentWindow.document;
+            const scrollingElement =
+                parentDocument.scrollingElement ||
+                parentDocument.documentElement ||
+                parentDocument.body;
+
+            parentWindow.requestAnimationFrame(() => {
+                scrollingElement.scrollTo({
+                    top: scrollingElement.scrollHeight,
+                    behavior: "smooth"
+                });
+            });
+        };
+
+        setTimeout(scrollToBottom, 100);
+        setTimeout(scrollToBottom, 400);
+        </script>
+        """,
+        height=0,
+    )
+
+
+def render_scroll_anchor(anchor_id):
+    st.markdown(
+        f'<div id="{anchor_id}" style="scroll-margin-top: 80px;"></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def scroll_to_anchor(anchor_id):
+    components.html(
+        f"""
+        <script>
+        const scrollToAnchor = () => {{
+            const parentDocument = window.parent.document;
+            const anchor = parentDocument.getElementById("{anchor_id}");
+
+            if (anchor) {{
+                anchor.scrollIntoView({{
+                    behavior: "smooth",
+                    block: "start"
+                }});
+            }}
+        }};
+
+        setTimeout(scrollToAnchor, 100);
+        setTimeout(scrollToAnchor, 400);
+        </script>
+        """,
+        height=0,
+    )
 
 
 def is_admin_email(email):
@@ -54,7 +123,75 @@ def render_admin_tools():
         else:
             st.sidebar.error(result["message"])
 
+    st.sidebar.subheader("Access requests")
+    access_requests = list_access_requests()
+    if access_requests:
+        st.sidebar.dataframe(
+            access_requests,
+            column_order=("email", "purpose", "comment", "created_at", "status"),
+            hide_index=True,
+            use_container_width=True,
+        )
+    else:
+        st.sidebar.caption("No access requests yet.")
+
     return debug_enabled
+
+
+def render_access_request_flow(authenticated_email):
+    st.warning("You have used all available questions for this account.")
+
+    if st.button(REQUEST_MORE_ACCESS_LABEL):
+        st.session_state.show_access_request_form = True
+        st.session_state.scroll_to_access_form = True
+        st.session_state.access_request_confirmation = None
+
+    if st.session_state.get("show_access_request_form"):
+        render_scroll_anchor(ACCESS_REQUEST_FORM_ANCHOR)
+
+        with st.form("access_request_form"):
+            st.text_input("Verified email", value=authenticated_email, disabled=True)
+            purpose = st.selectbox(
+                "Purpose",
+                ACCESS_REQUEST_PURPOSES,
+                index=None,
+                placeholder="Select a purpose",
+            )
+            comment = st.text_area(
+                "Comments/details (optional)",
+                max_chars=1000,
+            )
+            submit_request = st.form_submit_button("Submit request")
+
+        if submit_request:
+            result = submit_access_request(authenticated_email, purpose, comment)
+            if result["ok"]:
+                message = result.get("message") or ACCESS_REQUEST_SUBMITTED_MESSAGE
+                message_type = "success" if result.get("created") else "info"
+                st.session_state.access_request_confirmation = {
+                    "message": message,
+                    "type": message_type,
+                }
+                st.session_state.scroll_to_access_confirmation = True
+            else:
+                st.error(result["message"])
+
+        if st.session_state.get("access_request_confirmation"):
+            render_scroll_anchor(ACCESS_REQUEST_CONFIRMATION_ANCHOR)
+            confirmation = st.session_state.access_request_confirmation
+            if confirmation["type"] == "success":
+                st.success(confirmation["message"])
+            else:
+                st.info(confirmation["message"])
+
+        st.caption(f"You can also contact the administrator at {ADMIN_CONTACT_EMAIL}")
+
+        if st.session_state.get("scroll_to_access_confirmation"):
+            scroll_to_anchor(ACCESS_REQUEST_CONFIRMATION_ANCHOR)
+            st.session_state.scroll_to_access_confirmation = False
+        elif st.session_state.get("scroll_to_access_form"):
+            scroll_to_anchor(ACCESS_REQUEST_FORM_ANCHOR)
+            st.session_state.scroll_to_access_form = False
 
 
 def render_email_auth():
@@ -122,6 +259,10 @@ if st.button("Use another email"):
     st.session_state.pending_email = None
     st.session_state.dev_verification_code = None
     st.session_state.messages = []
+    st.session_state.show_access_request_form = False
+    st.session_state.scroll_to_access_form = False
+    st.session_state.scroll_to_access_confirmation = False
+    st.session_state.access_request_confirmation = None
     st.rerun()
 
 if st.button("🗑️ Clear chat"):
@@ -141,15 +282,14 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 if usage["remaining"] <= 0:
-    st.warning("To request additional access, please contact the administrator at qwqwbu@gmail.com. Briefly describe how you plan to use the application (e.g. for personal, business, or study purposes) and give a rough estimate of how many requests you expect to make. Thank you!")
+    render_access_request_flow(authenticated_email)
     question = None
 else:
     question = st.chat_input("Ask your question about GDPR")
 
 if question:
     if not can_ask_question(authenticated_email):
-        st.warning(
-            "To request access, please contact the administrator at qwqwbu@gmail.com")
+        render_access_request_flow(authenticated_email)
         st.stop()
 
     chat_history_before_current_question = st.session_state.messages.copy()
@@ -179,5 +319,7 @@ if question:
         "content": result,
     })
 
+    scroll_to_latest_message()
+
     if usage["remaining"] <= 0:
-        st.warning("To request additional access, please contact the administrator at qwqwbu@gmail.com. Briefly describe how you plan to use the application (e.g. for personal, business, or study purposes) and give a rough estimate of how many requests you expect to make. Thank you!")
+        render_access_request_flow(authenticated_email)

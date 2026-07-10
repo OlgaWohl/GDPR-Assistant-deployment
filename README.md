@@ -52,6 +52,7 @@ SMTP_PASSWORD=your_smtp_password
 EMAIL_FROM=your_sender@example.com
 
 ADMIN_EMAIL=admin@example.com
+ACCESS_REQUEST_EMAIL=access-requests@example.com
 USERS_DATABASE_PATH=/home/ow/app-data/gdpr-users.db
 
 # Local development only; omit or set false in production
@@ -93,9 +94,15 @@ verified through the same email-code flow, only that session can see the admin
 panel, access-management controls, and debug mode. Public users never see
 those controls or internal retrieval/debug information.
 
+When a verified user reaches their question limit, they can submit a request
+for more access inside the app. Set `ACCESS_REQUEST_EMAIL` to send those
+notifications to a dedicated inbox. If it is omitted, notifications fall back
+to `ADMIN_EMAIL`. Requests are always stored in SQLite before email delivery
+is attempted.
+
 Verification state and usage counts are stored in SQLite at
 `USERS_DATABASE_PATH`. Keep this database outside the Git checkout so user data
-survives deployments.
+survives deployments. The same database also stores access requests.
 
 `DEV_SHOW_VERIFICATION_CODE` defaults to false. Set it to `true` only for local
 testing if you need the verification code shown in the UI. Keep it unset or
