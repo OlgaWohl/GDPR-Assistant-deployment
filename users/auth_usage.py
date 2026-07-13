@@ -15,8 +15,28 @@ from users.email_service import (
 DEFAULT_QUESTIONS_PER_USER = database.DEFAULT_QUESTION_LIMIT
 CODE_EXPIRY_MINUTES = 10
 ACCESS_REQUEST_COOLDOWN_HOURS = 24
-ACCESS_REQUEST_PURPOSES = ("Work", "Study", "Personal use", "Other")
+USER_ROLE_OPTIONS = (
+    "Lawyer",
+    "Data Protection Officer (DPO)",
+    "Compliance professional",
+    "Software developer",
+    "Startup founder",
+    "Student",
+    "Private user",
+    "Other",
+)
+ANSWER_LENGTH_OPTIONS = ("Too short", "About right", "Too long")
+USE_AGAIN_OPTIONS = (
+    "Definitely",
+    "Probably",
+    "Not sure",
+    "Probably not",
+    "Definitely not",
+)
+SATISFACTION_RATINGS = (1, 2, 3, 4, 5)
 MAX_ACCESS_REQUEST_COMMENT_LENGTH = 1000
+MAX_CUSTOM_ROLE_LENGTH = 120
+MAX_FEEDBACK_COMMENT_LENGTH = 2000
 ACCESS_REQUEST_SUBMITTED_MESSAGE = (
     "Your request has been submitted. The administrator will review it shortly."
 )
@@ -51,6 +71,16 @@ def get_access_request_recipient():
 def _sanitize_access_request_comment(comment):
     sanitized = " ".join((comment or "").split())
     return sanitized[:MAX_ACCESS_REQUEST_COMMENT_LENGTH]
+
+
+def _sanitize_short_text(value, max_length):
+    sanitized = " ".join((value or "").split())
+    return sanitized[:max_length]
+
+
+def _sanitize_multiline_text(value, max_length):
+    sanitized = (value or "").strip()
+    return sanitized[:max_length]
 
 
 def _new_code():
@@ -182,10 +212,21 @@ def grant_more_access(email, extra_questions):
     }
 
 
-def submit_access_request(email, purpose, comment):
+def submit_access_request(
+    email,
+    user_role,
+    custom_role,
+    answer_length_rating,
+    satisfaction_rating,
+    use_again,
+    comments,
+):
     email = normalize_email(email)
-    purpose = (purpose or "").strip()
-    comment = _sanitize_access_request_comment(comment)
+    user_role = (user_role or "").strip()
+    custom_role = _sanitize_short_text(custom_role, MAX_CUSTOM_ROLE_LENGTH)
+    answer_length_rating = (answer_length_rating or "").strip()
+    use_again = (use_again or "").strip()
+    comments = _sanitize_multiline_text(comments, MAX_FEEDBACK_COMMENT_LENGTH)
 
     if not is_valid_email(email) or not is_verified(email):
         return {
@@ -194,12 +235,50 @@ def submit_access_request(email, purpose, comment):
             "message": "Please verify your email before requesting more access.",
         }
 
-    if purpose not in ACCESS_REQUEST_PURPOSES:
+    if user_role not in USER_ROLE_OPTIONS:
         return {
             "ok": False,
             "created": False,
-            "message": "Please select a purpose for your request.",
+            "message": "Please select what best describes you.",
         }
+
+    if user_role == "Other" and not custom_role:
+        return {
+            "ok": False,
+            "created": False,
+            "message": "Please specify your role or background.",
+        }
+
+    if answer_length_rating not in ANSWER_LENGTH_OPTIONS:
+        return {
+            "ok": False,
+            "created": False,
+            "message": "Please rate the length of the answers.",
+        }
+
+    if satisfaction_rating not in SATISFACTION_RATINGS:
+        return {
+            "ok": False,
+            "created": False,
+            "message": "Please select an overall satisfaction rating.",
+        }
+
+    if use_again not in USE_AGAIN_OPTIONS:
+        return {
+            "ok": False,
+            "created": False,
+            "message": "Please tell us whether you would use this assistant again.",
+        }
+
+    feedback = database.create_feedback(
+        email,
+        user_role,
+        custom_role if user_role == "Other" else "",
+        answer_length_rating,
+        satisfaction_rating,
+        use_again,
+        comments,
+    )
 
     cooldown_start = (
         datetime.now(timezone.utc) - timedelta(hours=ACCESS_REQUEST_COOLDOWN_HOURS)
@@ -212,7 +291,24 @@ def submit_access_request(email, purpose, comment):
             "message": ACCESS_REQUEST_RECENT_MESSAGE,
         }
 
-    access_request = database.create_access_request(email, purpose, comment)
+    role_for_request = custom_role if user_role == "Other" else user_role
+    purpose = "Additional access request"
+    request_comment = _sanitize_access_request_comment(
+        " | ".join(
+            value
+            for value in (
+                f"Feedback ID: {feedback['id']}",
+                f"Role: {role_for_request}",
+                f"Answer length: {answer_length_rating}",
+                f"Satisfaction: {satisfaction_rating}/5",
+                f"Use again: {use_again}",
+                f"Comments: {comments}" if comments else "",
+            )
+            if value
+        )
+    )
+
+    access_request = database.create_access_request(email, purpose, request_comment)
     recipient = get_access_request_recipient()
 
     if not recipient:
@@ -250,3 +346,7 @@ def submit_access_request(email, purpose, comment):
 
 def list_access_requests(limit=100):
     return [dict(row) for row in database.list_access_requests(limit)]
+
+
+def list_feedback():
+    return [dict(row) for row in database.list_feedback()]

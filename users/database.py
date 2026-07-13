@@ -78,6 +78,22 @@ def init_db():
             """
         )
 
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                email TEXT NOT NULL,
+                user_role TEXT NOT NULL,
+                custom_role TEXT,
+                answer_length_rating TEXT NOT NULL,
+                satisfaction_rating INTEGER NOT NULL,
+                use_again TEXT NOT NULL,
+                comments TEXT
+            )
+            """
+        )
+
 
 def upsert_verification_code(email, code, expires_at):
     init_db()
@@ -271,4 +287,70 @@ def list_access_requests(limit=100):
             LIMIT ?
             """,
             (limit,),
+        ).fetchall()
+
+
+def create_feedback(
+    email,
+    user_role,
+    custom_role,
+    answer_length_rating,
+    satisfaction_rating,
+    use_again,
+    comments,
+):
+    init_db()
+    now = utc_now_iso()
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO feedback (
+                created_at,
+                email,
+                user_role,
+                custom_role,
+                answer_length_rating,
+                satisfaction_rating,
+                use_again,
+                comments
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                now,
+                email,
+                user_role,
+                custom_role,
+                answer_length_rating,
+                satisfaction_rating,
+                use_again,
+                comments,
+            ),
+        )
+        return connection.execute(
+            "SELECT * FROM feedback WHERE id = ?",
+            (cursor.lastrowid,),
+        ).fetchone()
+
+
+def list_feedback():
+    init_db()
+
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT
+                id,
+                created_at,
+                email,
+                user_role,
+                custom_role,
+                answer_length_rating,
+                satisfaction_rating,
+                use_again,
+                comments
+            FROM feedback
+            ORDER BY created_at DESC
+            """
         ).fetchall()
