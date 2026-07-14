@@ -416,7 +416,8 @@ with st.expander("Example questions"):
     st.markdown("""
 - I would like to send marketing emails. What I shall consider?
 - What are controller obligations when using a subcontractor, who processes personal data?
-- What are GDPR requirements for video surveillance? Do I really need a cookie banner for my website?
+- What are GDPR requirements for video surveillance? 
+- Do I really need a cookie banner for my website?
 - My company isn’t based in Europe. Does GDPR still apply?
 - What are common GDPR violations in employment sector?
 """)
