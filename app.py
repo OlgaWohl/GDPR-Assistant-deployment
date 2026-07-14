@@ -204,6 +204,10 @@ def render_access_request_flow(authenticated_email):
 
         st.text_input("Verified email",
                       value=authenticated_email, disabled=True)
+        st.caption(
+            "Your email address is used to identify your account and process "
+            "this access request."
+        )
         user_role = st.selectbox(
             "What best describes you?",
             USER_ROLE_OPTIONS,
@@ -291,6 +295,43 @@ def render_access_request_flow(authenticated_email):
             st.session_state.scroll_to_access_form = False
 
 
+def render_sources_and_licenses():
+    with st.expander("Sources & Licenses"):
+        st.markdown(
+            """
+            <div style="font-size:0.9rem; line-height:1.45;">
+            <p>
+            This assistant uses official legal and regulatory materials for
+            informational and research purposes, including the
+            <a href="https://eur-lex.europa.eu/eli/reg/2016/679/oj" target="_blank">
+            General Data Protection Regulation</a>, official
+            <a href="https://www.edpb.europa.eu/our-work-tools/general-guidance/guidelines-recommendations-best-practices_en" target="_blank">
+            European Data Protection Board guidance</a>, and Article 29 Working
+            Party guidance where incorporated into or endorsed by the EDPB.
+            </p>
+
+            <p>
+            Enforcement analytics are based on the
+            <a href="https://www.enforcementtracker.com/" target="_blank">
+            Enforcement Tracker</a> database — enforcementtracker.com,
+            provided by CMS. The original database is licensed under
+            <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">
+            CC BY-NC-SA 4.0</a>. The original data has been converted,
+            cleaned and processed for analytical use in this assistant.
+            </p>
+
+            <p>
+            This assistant is an independent project. It is not affiliated
+            with the European Commission, the EDPB, CMS or Enforcement
+            Tracker. The content is provided for informational purposes and
+            is not legal advice.
+            </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
 def render_email_auth():
     if st.session_state.get("authenticated_email"):
         return st.session_state.authenticated_email
@@ -301,6 +342,11 @@ def render_email_auth():
         email = st.text_input(
             "Email",
             value=st.session_state.get("pending_email", ""),
+        )
+        st.caption(
+            "Your email address is used only to verify access, manage usage "
+            "limits, and process access requests or feedback. It is processed "
+            "only for operating this service."
         )
         request_code = st.form_submit_button("Send code")
 
@@ -370,7 +416,8 @@ with st.expander("Example questions"):
     st.markdown("""
 - I would like to send marketing emails. What I shall consider?
 - What are controller obligations when using a subcontractor, who processes personal data?
-- What are GDPR requirements for video surveillance?
+- What are GDPR requirements for video surveillance? Do I really need a cookie banner for my website?
+- My company isn’t based in Europe. Does GDPR still apply?
 - What are common GDPR violations in employment sector?
 """)
 
@@ -420,3 +467,5 @@ if question:
 
     if usage["remaining"] <= 0:
         render_access_request_flow(authenticated_email)
+
+render_sources_and_licenses()
