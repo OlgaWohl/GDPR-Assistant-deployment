@@ -30,7 +30,7 @@ users/*.db-*
 /ingest.py
 /guidance_metadata.py
 /data/
-
+/gdpr_csv/updated_gdpr_fines.csv
 /gdpr_data/
 
 /saved_models/

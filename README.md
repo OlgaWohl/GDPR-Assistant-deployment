@@ -108,3 +108,22 @@ survives deployments. The same database also stores access requests.
 testing if you need the verification code shown in the UI. Keep it unset or
 false in production. With the production default, missing or invalid SMTP
 configuration never exposes verification codes in the UI.
+## Data licence
+
+The enforcement analytics used by this project are based on the
+Enforcement Tracker database:
+
+**enforcementtracker.com, provided by CMS**
+
+The original database is licensed under the
+[Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+
+The data has been extracted, converted to CSV, cleaned and processed
+for analytical use in this assistant.
+
+The adapted enforcement dataset is subject to the terms of
+CC BY-NC-SA 4.0. The software code in this repository is licensed
+separately, where applicable.
+
+The full enforcement dataset is not distributed through this
+repository.
