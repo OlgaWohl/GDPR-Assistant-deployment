@@ -595,7 +595,7 @@ Top 5 lowest matching fines:
 # automatical retrive of context from the query
 
 
-def retrieve_context(query, pdf_limit=50, csv_limit=20, debug=False, return_metadata=False):
+def retrieve_context(query, pdf_limit=50, csv_limit=25, debug=False, return_metadata=False):
     query_vector = model.encode(query).tolist()
 
     pdf_results = qdrant_client.query_points(
@@ -999,8 +999,6 @@ def detect_question_type(query):
         "top sectors",
         "enforcement statistics",
         "fine statistics",
-        "statistics",
-        "analytics",
         "медиан",
         "максималь",
         "минималь",
@@ -1061,6 +1059,17 @@ def detect_question_type(query):
         "risks",
         "compliance",
         "article",
+        "cookie",
+        "cookies",
+        "cookie banner",
+        "tracking",
+        "trackers",
+        "tracker",
+        "prior consent"
+        # "google analytics",
+        # "pixel",
+        "strictly necessary",
+        "eprivacy",
         "правов",
         "требован",
         "обязан",
@@ -1101,7 +1110,6 @@ def detect_question_type(query):
         "count",
         "top",
         "statistics",
-        "analytics",
         "максималь",
         "минималь",
         "медиан",
