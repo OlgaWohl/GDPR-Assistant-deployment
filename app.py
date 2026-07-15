@@ -32,8 +32,9 @@ st.title("GDPR Assistant")
 
 st.markdown(
     """
-    <p style="font-size:18px; font-weight:600; margin-bottom:0.5rem;">
-    Your AI assistant for questions about the EU General Data Protection Regulation (GDPR)
+    <p style="font-size:22px; font-weight:600; margin-bottom:0.5rem;">
+    An AI-powered information tool for questions about <br>
+    the EU General Data Protection Regulation (GDPR)
     </p>
     """,
     unsafe_allow_html=True,
@@ -125,6 +126,46 @@ def scroll_to_anchor(anchor_id):
         </script>
         """,
         height=0,
+    )
+
+
+def render_chat_input_notice():
+    st.markdown(
+        """
+        <style>
+        .chat-input-legal-notice {
+            position: fixed;
+            left: 50%;
+            bottom: 0.35rem;
+            transform: translateX(-50%);
+            width: min(700px, calc(100vw - 2rem));
+            z-index: 999;
+            color: rgba(49, 51, 63, 0.72);
+            font-size: 0.9rem;
+            line-height: 1.35;
+            text-align: left;
+            pointer-events: none;
+        }
+
+        section.main > div {
+            padding-bottom: 2.25rem;
+        }
+
+        @media (max-width: 640px) {
+            .chat-input-legal-notice {
+                bottom: 0.25rem;
+                width: calc(100vw - 1rem);
+                font-size: 0.72rem;
+            }
+        }
+        </style>
+        <div class="chat-input-legal-notice">
+            This Assistant provides general compliance information and source-based guidance.<br>
+            It does not provide legal advice or assess your individual legal
+            situation.
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
 
@@ -345,8 +386,8 @@ def render_email_auth():
         )
         st.caption(
             "Your email address is used only to verify access, manage usage "
-            "limits, and process access requests or feedback. It is processed "
-            "only for operating this service."
+            "limits, and process access requests or feedback."
+            "It is processed only for operating this service."
         )
         request_code = st.form_submit_button("Send code")
 
@@ -431,6 +472,7 @@ if usage["remaining"] <= 0:
     question = None
 else:
     question = st.chat_input("Ask your question about GDPR")
+    render_chat_input_notice()
 
 if question:
     if not can_ask_question(authenticated_email):

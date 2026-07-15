@@ -1,0 +1,4 @@
+PyPDF2
+pandas
+qdrant-client
+sentence-transformers
