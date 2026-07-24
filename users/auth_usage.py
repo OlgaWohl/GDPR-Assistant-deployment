@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 from users import database
 from users.email_service import (
+    send_access_granted_notification,
     send_access_request_notification,
     send_verification_code,
 )
@@ -197,6 +198,17 @@ def grant_more_access(email, extra_questions):
 
     user = database.grant_extra_questions(email, extra_questions)
     remaining = max(user["question_limit"] - user["question_count"], 0)
+    email_delivery_status = "sent"
+
+    try:
+        send_access_granted_notification(
+            email,
+            remaining,
+            user["question_limit"],
+        )
+    except Exception:
+        logger.exception("Access granted email delivery failed")
+        email_delivery_status = "failed"
 
     return {
         "ok": True,
@@ -209,6 +221,7 @@ def grant_more_access(email, extra_questions):
             "remaining": remaining,
             "limit": user["question_limit"],
         },
+        "email_delivery_status": email_delivery_status,
     }
 
 
@@ -350,3 +363,7 @@ def list_access_requests(limit=100):
 
 def list_feedback():
     return [dict(row) for row in database.list_feedback()]
+
+
+def list_users():
+    return [dict(row) for row in database.list_users()]

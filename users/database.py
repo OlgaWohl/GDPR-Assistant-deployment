@@ -290,6 +290,44 @@ def list_access_requests(limit=100):
         ).fetchall()
 
 
+def list_users():
+    init_db()
+
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT
+                email,
+                CASE
+                    WHEN verified_at IS NULL THEN 0
+                    ELSE 1
+                END AS is_verified,
+                verified_at,
+                question_limit,
+                question_count AS questions_used,
+                MAX(question_limit - question_count, 0) AS remaining_questions,
+                created_at,
+                updated_at AS last_access_at,
+                (
+                    SELECT access_requests.status
+                    FROM access_requests
+                    WHERE access_requests.email = users.email
+                    ORDER BY access_requests.created_at DESC
+                    LIMIT 1
+                ) AS latest_access_request_status,
+                (
+                    SELECT access_requests.created_at
+                    FROM access_requests
+                    WHERE access_requests.email = users.email
+                    ORDER BY access_requests.created_at DESC
+                    LIMIT 1
+                ) AS latest_access_request_at
+            FROM users
+            ORDER BY created_at DESC
+            """
+        ).fetchall()
+
+
 def create_feedback(
     email,
     user_role,

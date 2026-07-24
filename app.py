@@ -16,6 +16,7 @@ from users.auth_usage import (
     get_question_usage,
     list_access_requests,
     list_feedback,
+    list_users,
     normalize_email,
     request_verification_code,
     verify_email_code,
@@ -185,6 +186,17 @@ def build_feedback_csv(feedback_rows):
     return output.getvalue()
 
 
+def build_users_csv(user_rows):
+    if not user_rows:
+        return ""
+
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=user_rows[0].keys())
+    writer.writeheader()
+    writer.writerows(user_rows)
+    return output.getvalue()
+
+
 def render_admin_tools():
     st.sidebar.header("Admin")
     debug_enabled = st.sidebar.checkbox("Debug mode", value=False)
@@ -204,6 +216,10 @@ def render_admin_tools():
         result = grant_more_access(email, int(extra_questions))
         if result["ok"]:
             st.sidebar.success(result["message"])
+            if result.get("email_delivery_status") == "failed":
+                st.sidebar.warning(
+                    "Access was updated, but the notification email was not sent."
+                )
         else:
             st.sidebar.error(result["message"])
 
@@ -227,6 +243,15 @@ def render_admin_tools():
         file_name="feedback_export.csv",
         mime="text/csv",
         disabled=not feedback_rows,
+    )
+
+    user_rows = list_users()
+    st.sidebar.download_button(
+        "Download Users",
+        data=build_users_csv(user_rows),
+        file_name="users_export.csv",
+        mime="text/csv",
+        disabled=not user_rows,
     )
 
     return debug_enabled

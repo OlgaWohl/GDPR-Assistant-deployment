@@ -86,3 +86,17 @@ def send_access_request_notification(to_email, user_email, purpose, comment, cre
         "New GDPR Assistant access request",
         body,
     )
+
+
+def send_access_granted_notification(to_email, questions_remaining, question_limit):
+    body = (
+        "Your GDPR Assistant access has been updated.\n\n"
+        f"You now have {questions_remaining} questions remaining "
+        f"out of a total limit of {question_limit}.\n\n"
+        "You can return to GDPR Assistant and continue using your verified email."
+    )
+    return send_email(
+        to_email,
+        "Your GDPR Assistant access has been updated",
+        body,
+    )
